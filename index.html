@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg">
+<title>Carte Nere: Bot</title>
+<style>
+:root{color-scheme:dark;--bg:#090909;--panel:#171717;--line:#343434;--muted:#aaa}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:#fff;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
+.app{max-width:760px;margin:auto;padding:18px 16px 100px;min-height:100vh}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}.brand{font-size:25px;font-weight:950}.pill{border:1px solid var(--line);background:#222;border-radius:999px;padding:8px 11px;font-size:13px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:18px;margin:14px 0}.stack{display:grid;gap:12px}
+input,button{font:inherit}input{width:100%;padding:14px;border-radius:14px;border:1px solid var(--line);background:#111;color:#fff}
+button{padding:13px 16px;border:0;border-radius:14px;font-weight:850;cursor:pointer}button:disabled{opacity:.42}.primary{background:#fff;color:#000}.secondary{background:#2b2b2b;color:#fff}.danger{background:#571919;color:#fff}
+.row{display:flex;gap:10px;flex-wrap:wrap}.row>*{flex:1}.hidden{display:none!important}.muted{color:var(--muted)}
+.black{background:#030303;border:1px solid #333;border-radius:18px;padding:20px;min-height:135px;font-weight:900;font-size:22px;line-height:1.2}
+.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+.card{background:#fafafa;color:#080808;border-radius:17px;padding:16px;min-height:125px;font-weight:800;cursor:pointer;line-height:1.2}
+.card.selected{outline:4px solid #83f27b;transform:translateY(-2px)}
+.answer{background:#fafafa;color:#080808;border-radius:17px;padding:17px;margin:10px 0;font-weight:850;cursor:pointer}.answer.selected{outline:4px solid #83f27b}
+.score{display:grid;grid-template-columns:1fr auto;gap:8px;padding:10px 0;border-bottom:1px solid #2d2d2d}.score:last-child{border:0}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#fff;color:#000;padding:12px 16px;border-radius:999px;font-weight:850;opacity:0;transition:.2s;pointer-events:none}.toast.show{opacity:1}
+.reveal{padding:12px;border-radius:14px;background:#252525;margin:8px 0}.small{font-size:13px}
+@media(min-width:680px){.cards{grid-template-columns:repeat(3,minmax(0,1fr))}}
+</style>
+</head>
+<body>
+<div class="app">
+<div class="top"><div class="brand">CARTE NERE 🤖</div><div id="status" class="pill">offline</div></div>
+
+<section id="home" class="panel stack">
+<h1>Duello contro i bot</h1>
+<p class="muted">Due persone giocano una risposta ciascuna. L'app aggiunge tre risposte casuali. Entrambi votate senza sapere chi ha giocato cosa.</p>
+<input id="name" maxlength="18" placeholder="Il tuo nome">
+<button id="hostBtn" class="primary">Crea stanza</button>
+<div class="row"><input id="codeInput" maxlength="6" placeholder="Codice stanza"><button id="joinBtn" class="secondary">Entra</button></div>
+</section>
+
+<section id="lobby" class="panel stack hidden">
+<h2>Stanza <span id="code"></span></h2>
+<div id="players"></div>
+<p class="muted">La partita parte con esattamente due persone.</p>
+<button id="startBtn" class="primary hidden">Inizia</button>
+<button id="leaveBtn" class="danger">Esci</button>
+</section>
+
+<main id="game" class="hidden">
+<section class="panel"><div class="row"><div><div class="small muted">Round</div><strong id="round">1</strong></div><div><div class="small muted">Bot</div><strong>3 goblin digitali</strong></div></div></section>
+<section class="panel"><div id="blackCard" class="black">Carta nera</div></section>
+
+<section id="handPanel" class="panel hidden">
+<h3>La tua mano <span id="pickText" class="muted"></span></h3>
+<div id="hand" class="cards"></div>
+<button id="playBtn" class="primary" style="width:100%;margin-top:14px" disabled>Gioca</button>
+</section>
+
+<section id="waitPanel" class="panel hidden"><h3>Attendi</h3><p id="waitText" class="muted"></p></section>
+
+<section id="votePanel" class="panel hidden">
+<h3>Vota la risposta migliore</h3>
+<p class="muted">Puoi persino votare la tua senza saperlo. Eleganza criminale.</p>
+<div id="answers"></div>
+<button id="voteBtn" class="primary" style="width:100%" disabled>Conferma voto</button>
+</section>
+
+<section id="revealPanel" class="panel hidden">
+<h3>Verdetto</h3><div id="reveal"></div>
+<button id="nextBtn" class="primary hidden" style="width:100%">Prossimo round</button>
+</section>
+
+<section class="panel"><h3>Punteggi</h3><div id="scores"></div></section>
+</main>
+</div>
+<div id="toast" class="toast"></div>
+<script src="deck.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+const $=s=>document.querySelector(s), shuffle=a=>{a=[...a];for(let i=a.length-1;i;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const esc=s=>String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+const toast=t=>{let x=$("#toast");x.textContent=t;x.classList.add("show");setTimeout(()=>x.classList.remove("show"),1800)};
+const hostId=c=>"carte-bot-"+c.toLowerCase(), code=()=>Math.random().toString(36).slice(2,8).toUpperCase();
+
+let peer,conn,isHost=false,myId=null,room=null,state=null,clients=new Map(),selectedCards=[],selectedVote=null;
+
+function send(c,m){if(c&&c.open)c.send(m)}
+function pub(){
+ return {phase:state.phase,round:state.round,black:state.black,players:state.players.map(p=>({id:p.id,name:p.name,score:p.score,submitted:!!state.submissions[p.id],voted:state.votes[p.id]!==undefined})),answers:state.phase==="vote"?state.answers.map(a=>({cards:a.cards})):[],reveal:state.phase==="reveal"?state.answers.map((a,i)=>({cards:a.cards,owner:a.ownerLabel,votes:state.tally[i]||0})):[]}
+}
+function broadcast(){
+ const p=pub();
+ render(p,state.hands[myId]||[]);
+ for(const [id,c] of clients)send(c,{type:"state",state:p,hand:state.hands[id]||[]});
+}
+function showLobby(){
+ $("#home").classList.add("hidden");$("#lobby").classList.remove("hidden");$("#game").classList.add("hidden");$("#code").textContent=room;renderLobby()
+}
+function renderLobby(){
+ const ps=state?.players||[];
+ $("#players").innerHTML=ps.map(p=>`<div class="score"><span>${esc(p.name)}</span><span>connesso</span></div>`).join("");
+ $("#startBtn").classList.toggle("hidden",!isHost||ps.length!==2)
+}
+function player(id){return (state.players||[]).find(p=>p.id===id)}
+function render(s,hand){
+ state=isHost?state:{...state,...s,players:s.players};
+ $("#home").classList.add("hidden");$("#lobby").classList.add("hidden");$("#game").classList.remove("hidden");
+ $("#round").textContent=s.round;$("#blackCard").textContent=s.black?.text||"";
+ $("#scores").innerHTML=s.players.map(p=>`<div class="score"><span>${esc(p.name)}</span><strong>${p.score}</strong></div>`).join("")+`<div class="score"><span>Bot</span><strong>${state.botScore||0}</strong></div>`;
+ ["#handPanel","#waitPanel","#votePanel","#revealPanel"].forEach(x=>$(x).classList.add("hidden"));
+ if(s.phase==="submit"){
+   const me=s.players.find(p=>p.id===myId);
+   if(me?.submitted){$("#waitPanel").classList.remove("hidden");$("#waitText").textContent="Carta inviata. Aspettiamo l'altra mente umana."}
+   else{$("#handPanel").classList.remove("hidden");selectedCards=[];$("#pickText").textContent=`scegline ${s.black.pick}`;$("#hand").innerHTML=hand.map((c,i)=>`<div class="card" data-i="${i}">${esc(c)}</div>`).join("");$("#playBtn").disabled=true}
+ }
+ if(s.phase==="vote"){
+   const me=s.players.find(p=>p.id===myId);
+   if(me?.voted){$("#waitPanel").classList.remove("hidden");$("#waitText").textContent="Voto registrato. Il secondo verdetto sta arrivando."}
+   else{$("#votePanel").classList.remove("hidden");selectedVote=null;$("#voteBtn").disabled=true;$("#answers").innerHTML=s.answers.map((a,i)=>`<div class="answer" data-v="${i}">${a.cards.map(esc).join("<br><br>")}</div>`).join("")}
+ }
+ if(s.phase==="reveal"){
+   $("#revealPanel").classList.remove("hidden");
+   $("#reveal").innerHTML=s.reveal.map(a=>`<div class="reveal"><strong>${a.votes} voto/i</strong> · ${esc(a.owner)}<br><span class="muted">${a.cards.map(esc).join(" / ")}</span></div>`).join("");
+   $("#nextBtn").classList.toggle("hidden",!isHost)
+ }
+}
+function draw(id){while(state.hands[id].length<10&&state.whiteDeck.length)state.hands[id].push(state.whiteDeck.pop())}
+function start(){
+ state.players.forEach(p=>draw(p.id));state.round=0;state.botScore=0;nextRound()
+}
+function nextRound(){
+ if(!state.blackDeck.length)state.blackDeck=shuffle(CAH_DECK.black);
+ state.round++;state.black=state.blackDeck.pop();state.submissions={};state.votes={};state.answers=[];state.tally={};state.phase="submit";broadcast()
+}
+function beginVote(){
+ let answers=Object.values(state.submissions).map(x=>({cards:x.cards,ownerId:x.playerId,ownerLabel:player(x.playerId).name}));
+ for(let b=0;b<3;b++){
+   let cards=[];for(let j=0;j<state.black.pick;j++)cards.push(state.whiteDeck.pop()||"Un bot senza fantasia");
+   answers.push({cards,ownerId:"bot",ownerLabel:"Bot"})
+ }
+ state.answers=shuffle(answers);state.phase="vote";broadcast()
+}
+function finish(){
+ state.tally={};Object.values(state.votes).forEach(i=>state.tally[i]=(state.tally[i]||0)+1);
+ Object.entries(state.tally).forEach(([i,n])=>{let a=state.answers[+i];if(a.ownerId==="bot")state.botScore+=n;else player(a.ownerId).score+=n});
+ state.phase="reveal";broadcast()
+}
+function hostMessage(c,m){
+ if(m.type==="join"){
+   if(state.phase!=="lobby"||state.players.length>=2)return send(c,{type:"error",message:"Stanza piena o partita iniziata"});
+   clients.set(c.peer,c);state.players.push({id:c.peer,name:m.name,score:0});state.hands[c.peer]=[];send(c,{type:"joined",id:c.peer,room,players:state.players,botScore:0});renderLobby()
+ }
+ if(m.type==="submit"&&state.phase==="submit"){
+   let h=state.hands[m.id],idx=[...new Set(m.indices)];
+   if(!h||idx.length!==state.black.pick||idx.some(i=>i<0||i>=h.length))return;
+   let cards=m.indices.map(i=>h[i]);state.submissions[m.id]={playerId:m.id,cards};
+   [...idx].sort((a,b)=>b-a).forEach(i=>h.splice(i,1));draw(m.id);
+   if(Object.keys(state.submissions).length===2)beginVote();else broadcast()
+ }
+ if(m.type==="vote"&&state.phase==="vote"&&state.votes[m.id]===undefined){
+   state.votes[m.id]=m.index;if(Object.keys(state.votes).length===2)finish();else broadcast()
+ }
+}
+$("#hostBtn").onclick=()=>{
+ let name=$("#name").value.trim();if(!name)return toast("Scrivi il nome");
+ isHost=true;myId="host";room=code();peer=new Peer(hostId(room));
+ peer.on("open",()=>{state={phase:"lobby",round:0,players:[{id:myId,name,score:0}],hands:{[myId]:[]},whiteDeck:shuffle(CAH_DECK.white),blackDeck:shuffle(CAH_DECK.black),submissions:{},votes:{},answers:[],tally:{},botScore:0};$("#status").textContent="host online";showLobby()});
+ peer.on("connection",c=>{c.on("data",m=>hostMessage(c,m));c.on("close",()=>toast("L'altro giocatore si è scollegato"))})
+}
+$("#joinBtn").onclick=()=>{
+ let name=$("#name").value.trim(),c=$("#codeInput").value.trim().toUpperCase();if(!name||c.length<4)return toast("Nome e codice");
+ room=c;peer=new Peer();peer.on("open",id=>{myId=id;conn=peer.connect(hostId(room),{reliable:true});conn.on("open",()=>send(conn,{type:"join",name}));conn.on("data",m=>{if(m.type==="joined"){state={phase:"lobby",players:m.players,botScore:0};showLobby()}if(m.type==="state")render(m.state,m.hand);if(m.type==="error")toast(m.message)};$("#status").textContent="online"})
+}
+$("#startBtn").onclick=start;$("#leaveBtn").onclick=()=>location.reload();$("#nextBtn").onclick=nextRound;
+$("#hand").onclick=e=>{let c=e.target.closest(".card");if(!c)return;let i=+c.dataset.i,p=state.black.pick;if(selectedCards.includes(i)){selectedCards=selectedCards.filter(x=>x!==i);c.classList.remove("selected")}else if(selectedCards.length<p){selectedCards.push(i);c.classList.add("selected")}$("#playBtn").disabled=selectedCards.length!==p}
+$("#playBtn").onclick=()=>{let m={type:"submit",id:myId,indices:selectedCards};isHost?hostMessage({peer:myId},m):send(conn,m)}
+$("#answers").onclick=e=>{let a=e.target.closest(".answer");if(!a)return;document.querySelectorAll(".answer").forEach(x=>x.classList.remove("selected"));a.classList.add("selected");selectedVote=+a.dataset.v;$("#voteBtn").disabled=false}
+$("#voteBtn").onclick=()=>{let m={type:"vote",id:myId,index:selectedVote};isHost?hostMessage({peer:myId},m):send(conn,m)}
+if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script>
+</body></html>

@@ -1,0 +1,1 @@
+const C='carte-bot-v1';const A=['./','./index.html','./deck.js','./manifest.webmanifest','./icon.svg'];self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(x=>x.addAll(A))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));
