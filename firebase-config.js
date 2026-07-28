@@ -1,7 +1,6 @@
 // Incolla qui la configurazione della tua app Web Firebase.
 // Firebase Console → Impostazioni progetto → Le tue app → Web app.
-window.FIREBASE_CONFIG = {
-  apiKey: "AIzaSyAclh1hgV-WDe8KEvesU7LVqZkIn61upEc",
+window.FIREBASE_CONFIG = { apiKey: "AIzaSyAclh1hgV-WDe8KEvesU7LVqZkIn61upEc",
   authDomain: "cartenerissime-b26df.firebaseapp.com",
   databaseURL: "https://cartenerissime-b26df-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "cartenerissime-b26df",
