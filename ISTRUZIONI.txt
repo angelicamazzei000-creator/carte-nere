@@ -1,0 +1,21 @@
+VERSIONE FINALE
+
+- I bot entrano soltanto quando comincia la partita.
+- Bot Nero e Bot Bianco giocano e possono fare punti.
+- I bot NON diventano mai Zar.
+- Lo Zar ruota soltanto tra i giocatori umani.
+- Vince il primo giocatore, umano o bot, che raggiunge 15 punti.
+
+INSTALLAZIONE
+1. Apri index.html nel repository GitHub.
+2. Premi la matita.
+3. Cancella tutto il contenuto.
+4. Copia tutto dal nuovo index.html.
+5. Incollalo su GitHub.
+6. Premi Commit changes.
+7. Aspetta circa un minuto.
+8. Ricarica forzatamente il sito:
+   Mac: Command + Shift + R
+   Windows: Ctrl + F5
+
+Non modificare deck.js o gli altri file.
